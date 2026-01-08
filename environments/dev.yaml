@@ -1,0 +1,4 @@
+name: dev
+approvalRequired: false
+parallelTenants: true
+rollbackEnabled: false

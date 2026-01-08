@@ -1,0 +1,22 @@
+releaseId: 2026.01
+type: standard
+
+platform:
+  repo: aem-platform-core
+  version: 1.12.0
+  pipeline: platform-prod
+
+tenants:
+  us:
+    repo: aem-tenant-us
+    version: 3.8.2
+    pipeline: tenant-us-prod
+  ca:
+    repo: aem-tenant-ca
+    version: 2.4.1
+    pipeline: tenant-ca-prod
+
+order:
+  - platform
+  - us
+  - ca

@@ -1,0 +1,4 @@
+name: prod
+approvalRequired: true
+parallelTenants: false
+rollbackEnabled: true

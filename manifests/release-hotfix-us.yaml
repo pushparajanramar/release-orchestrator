@@ -1,0 +1,17 @@
+releaseId: hotfix-us-2026-01
+type: hotfix
+
+platform:
+  repo: aem-platform-core
+  version: 1.12.1
+  pipeline: platform-prod
+
+tenants:
+  us:
+    repo: aem-tenant-us
+    version: 3.8.3
+    pipeline: tenant-us-prod
+
+order:
+  - platform
+  - us

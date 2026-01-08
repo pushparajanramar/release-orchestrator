@@ -1,0 +1,4 @@
+name: stage
+approvalRequired: true
+parallelTenants: false
+rollbackEnabled: true

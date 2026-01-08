@@ -1,0 +1,90 @@
+name: Release Orchestrator
+
+on:
+  # Automatic deployment for dev/stage on push to release branches
+  push:
+    branches:
+      - 'release/dev'
+      - 'release/stage'
+    paths:
+      - 'manifests/**'
+      - 'environments/**'
+  
+  # Manual deployment for production
+  workflow_dispatch:
+    inputs:
+      manifest:
+        description: 'Release manifest file'
+        required: true
+        default: 'release-2026-01.yaml'
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'prod'
+
+jobs:
+  # Determine environment and trigger type
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      environment: ${{ steps.env.outputs.environment }}
+      manifest: ${{ steps.env.outputs.manifest }}
+      is_manual: ${{ steps.env.outputs.is_manual }}
+    steps:
+      - name: Determine Environment and Manifest
+        id: env
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "environment=${{ github.event.inputs.environment }}" >> $GITHUB_OUTPUT
+            echo "manifest=${{ github.event.inputs.manifest }}" >> $GITHUB_OUTPUT
+            echo "is_manual=true" >> $GITHUB_OUTPUT
+          else
+            # Automatic deployment based on branch
+            case "${{ github.ref_name }}" in
+              "release/dev")
+                echo "environment=dev" >> $GITHUB_OUTPUT
+                echo "manifest=release-2026-01.yaml" >> $GITHUB_OUTPUT
+                ;;
+              "release/stage") 
+                echo "environment=stage" >> $GITHUB_OUTPUT
+                echo "manifest=release-2026-01.yaml" >> $GITHUB_OUTPUT
+                ;;
+            esac
+            echo "is_manual=false" >> $GITHUB_OUTPUT
+          fi
+  validate:
+    needs: setup
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Validate Manifest
+        run: ./scripts/validate-manifest.sh ${{ needs.setup.outputs.manifest }}
+      - name: Check Approvals for Production
+        if: needs.setup.outputs.environment == 'prod'
+        run: |
+          if [ ! -f "approvals/${{ needs.setup.outputs.manifest }}.approved" ]; then
+            echo "❌ No approval found for production release"
+            echo "📋 Create approvals/${{ needs.setup.outputs.manifest }}.approved file"
+            exit 1
+          fi
+          echo "✅ Production approval verified"
+      - name: Skip Approval Check for Dev/Stage
+        if: needs.setup.outputs.environment != 'prod'
+        run: echo "🚀 Automatic deployment to ${{ needs.setup.outputs.environment }} - no approval required"
+
+  deploy:
+    needs: [setup, validate]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Deploy Platform
+        run: ./scripts/trigger-cm-pipeline.sh platform
+      - name: Wait for Platform
+        run: ./scripts/wait-for-pipeline.sh platform
+      - name: Deploy Tenants
+        run: |
+          echo "🌍 Starting tenant deployments for ${{ needs.setup.outputs.environment }} environment"
+          # Read manifest and deploy tenants in order
+          # Implementation depends on manifest parsing
