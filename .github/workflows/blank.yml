@@ -1,0 +1,47 @@
+name: Release Orchestrator
+
+on:
+  workflow_dispatch:
+    inputs:
+      manifest:
+        description: 'Release manifest file'
+        required: true
+        default: 'release-2026-01.yaml'
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'prod'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Validate Manifest
+        run: ./scripts/validate-manifest.sh ${{ github.event.inputs.manifest }}
+      - name: Check Approvals for Production
+        if: github.event.inputs.environment == 'prod'
+        run: |
+          if [ ! -f "approvals/${{ github.event.inputs.manifest }}.approved" ]; then
+            echo "❌ No approval found for production release"
+            echo "📋 Create approvals/${{ github.event.inputs.manifest }}.approved file"
+            exit 1
+          fi
+          echo "✅ Production approval verified"
+
+  deploy:
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Deploy Platform
+        run: ./scripts/trigger-cm-pipeline.sh platform
+      - name: Wait for Platform
+        run: ./scripts/wait-for-pipeline.sh platform
+      - name: Deploy Tenants
+        run: |
+          echo "🌍 Starting tenant deployments for ${{ github.event.inputs.environment }} environment"
+          # Read manifest and deploy tenants in order
+          # Implementation depends on manifest parsing
