@@ -18,8 +18,18 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq
+          # Install yq
+          wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+          chmod +x /usr/local/bin/yq
+
       - name: Validate Manifest
         run: ./scripts/validate-manifest.sh ${{ github.event.inputs.manifest }}
+
       - name: Check Approvals for Production
         if: github.event.inputs.environment == 'prod'
         run: |
@@ -33,15 +43,52 @@ jobs:
   deploy:
     needs: validate
     runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq
+          # Install yq
+          wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+          chmod +x /usr/local/bin/yq
+
+      - name: Load Environment Variables
+        run: |
+          echo "CM_CLIENT_ID=${{ secrets.CM_CLIENT_ID }}" >> $GITHUB_ENV
+          echo "CM_CLIENT_SECRET=${{ secrets.CM_CLIENT_SECRET }}" >> $GITHUB_ENV
+          echo "CM_API_KEY=${{ secrets.CM_API_KEY }}" >> $GITHUB_ENV
+          echo "CM_ORG_ID=${{ secrets.CM_ORG_ID }}" >> $GITHUB_ENV
+
       - name: Deploy Platform
         run: ./scripts/trigger-cm-pipeline.sh platform
+
       - name: Wait for Platform
         run: ./scripts/wait-for-pipeline.sh platform
+
       - name: Deploy Tenants
         run: |
           echo "🌍 Starting tenant deployments for ${{ github.event.inputs.environment }} environment"
-          # Read manifest and deploy tenants in order
-          # Implementation depends on manifest parsing
+
+          # Get tenant deployment order from manifest
+          ORDER=$(yq e '.order[]' "manifests/${{ github.event.inputs.manifest }}")
+
+          for pipeline in $ORDER; do
+            if [ "$pipeline" = "platform" ]; then
+              echo "⏭️  Skipping platform (already deployed)"
+              continue
+            fi
+
+            echo "🚀 Deploying tenant: $pipeline"
+            ./scripts/trigger-cm-pipeline.sh "$pipeline"
+
+            echo "⏳ Waiting for tenant: $pipeline"
+            ./scripts/wait-for-pipeline.sh "$pipeline"
+
+            echo "✅ Tenant $pipeline completed"
+          done
+
+          echo "🎉 All deployments completed successfully!"
