@@ -95,9 +95,50 @@ The scripts use Cloud Manager REST API v2. Authentication follows Adobe IMS:
 - Scripts should handle token generation and refresh
 - Store sensitive data only in GitHub Secrets
 
-### Testing the Setup
+### Environment Setup
 
-1. Run a test release to dev environment first
+1. **Copy environment template**:
+   ```bash
+   cp .env.example .env
+   ```
+
+2. **Configure credentials** in `.env`:
+   ```bash
+   CM_CLIENT_ID=your_actual_client_id
+   CM_CLIENT_SECRET=your_actual_client_secret  
+   CM_API_KEY=your_actual_api_key
+   CM_ORG_ID=your_actual_org_id
+   ```
+
+3. **Load environment variables**:
+   ```bash
+   source .env
+   ```
+
+### Using the Trigger Script
+
+#### **Local Testing**
+```bash
+# Load environment variables
+source .env
+
+# Trigger a specific pipeline
+./scripts/trigger-cm-pipeline.sh platform-dev
+
+# Expected output:
+# Triggering pipeline: platform-dev (ID: 123456, Program: 78910)
+# API Endpoint: https://cloudmanager.adobe.io/api/program/78910/pipeline/123456/execution
+# ✅ Access token obtained
+# ✅ Pipeline triggered successfully (HTTP 201)
+# 📋 Execution ID: 987654
+```
+
+#### **Script Parameters**
+- **Input**: Pipeline name (matches `pipelines/*.yaml` filename)
+- **Output**: Execution status and ID for tracking
+- **Exit codes**: 0=success, 1=failure
+
+### Testing the Setup
 2. Verify pipeline triggers in Cloud Manager dashboard
 3. Check logs for API errors or authentication issues
 4. Confirm deployment order and success notifications
