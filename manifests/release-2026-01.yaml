@@ -4,17 +4,17 @@ type: standard
 platform:
   repo: aem-platform-core
   version: 1.12.0
-  pipeline: platform-prod
+  pipeline: platform
 
 tenants:
   us:
     repo: aem-tenant-us
     version: 3.8.2
-    pipeline: tenant-us-prod
+    pipeline: tenant-us
   ca:
     repo: aem-tenant-ca
     version: 2.4.1
-    pipeline: tenant-ca-prod
+    pipeline: tenant-ca
 
 order:
   - platform
