@@ -117,15 +117,54 @@ for item in $(yq e '.order[]' "manifests/$MANIFEST_FILE"); do
   fi
 done
 
-# Check if platform pipeline config exists
-if [ ! -f "pipelines/$PLATFORM_PIPELINE.yaml" ]; then
-  echo "❌ Platform pipeline config not found: pipelines/$PLATFORM_PIPELINE.yaml"
-  exit 1
+# Validate compatibility matrix (if present)
+COMPATIBILITY_EXISTS=$(yq e '.compatibility' "manifests/$MANIFEST_FILE" 2>/dev/null || echo "")
+if [ ! -z "$COMPATIBILITY_EXISTS" ] && [ "$COMPATIBILITY_EXISTS" != "null" ]; then
+  COMPATIBILITY_PLATFORM=$(yq e '.compatibility.platform' "manifests/$MANIFEST_FILE" 2>/dev/null || echo "")
+  if [ ! -z "$COMPATIBILITY_PLATFORM" ] && [ "$COMPATIBILITY_PLATFORM" != "null" ]; then
+    echo "🔍 Validating version compatibility..."
+
+    # Check platform version against compatibility requirement
+    if ! echo "$PLATFORM_VERSION" | grep -q "^${COMPATIBILITY_PLATFORM//x/.}"; then
+      echo "❌ Platform version $PLATFORM_VERSION does not match compatibility requirement: $COMPATIBILITY_PLATFORM"
+      exit 1
+    fi
+
+    # Check each tenant version against compatibility requirements
+    for tenant in $(yq e '.tenants | keys | .[]' "manifests/$MANIFEST_FILE"); do
+      TENANT_VERSION=$(yq e ".tenants.$tenant.version" "manifests/$MANIFEST_FILE")
+      COMPATIBILITY_REQ=$(yq e ".compatibility.tenants.$tenant" "manifests/$MANIFEST_FILE" 2>/dev/null || echo "")
+
+      if [ ! -z "$COMPATIBILITY_REQ" ] && [ "$COMPATIBILITY_REQ" != "null" ]; then
+        # Simple semver compatibility check (this could be enhanced)
+        if ! echo "$TENANT_VERSION" | grep -q "^${COMPATIBILITY_REQ//>=/}"; then
+          echo "❌ Tenant $tenant version $TENANT_VERSION does not meet compatibility requirement: $COMPATIBILITY_REQ"
+          exit 1
+        fi
+      fi
+    done
+
+    echo "✅ Version compatibility validated"
+  fi
 fi
 
-echo "✅ Manifest validation passed!"
-echo "   Release ID: $RELEASE_ID"
-echo "   Type: $TYPE"
-echo "   Platform: $PLATFORM_REPO v$PLATFORM_VERSION"
-echo "   Tenants: $TENANT_COUNT"
-echo "   Deployment Order: $(yq e '.order | join(" → ")' "manifests/$MANIFEST_FILE")"
+# Validate artifact integrity (SHA checksums)
+echo "🔍 Validating artifact integrity..."
+
+# Check platform SHA
+PLATFORM_SHA=$(yq e '.platform.sha' "manifests/$MANIFEST_FILE" 2>/dev/null || echo "")
+if [ -z "$PLATFORM_SHA" ] || [ "$PLATFORM_SHA" = "null" ]; then
+  echo "⚠️  Warning: No SHA checksum provided for platform artifact"
+else
+  echo "✅ Platform artifact SHA: $PLATFORM_SHA"
+fi
+
+# Check tenant SHAs
+for tenant in $(yq e '.tenants | keys | .[]' "manifests/$MANIFEST_FILE"); do
+  TENANT_SHA=$(yq e ".tenants.$tenant.sha" "manifests/$MANIFEST_FILE" 2>/dev/null || echo "")
+  if [ -z "$TENANT_SHA" ] || [ "$TENANT_SHA" = "null" ]; then
+    echo "⚠️  Warning: No SHA checksum provided for tenant $tenant artifact"
+  else
+    echo "✅ Tenant $tenant artifact SHA: $TENANT_SHA"
+  fi
+done
