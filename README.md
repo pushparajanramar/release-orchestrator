@@ -29,15 +29,39 @@ Think of it as **"release intent + automation"**.
 - Pipeline IDs and Program IDs for each pipeline (platform and tenants)
 - GitHub repository with Actions enabled
 
-### GitHub Secrets Configuration
+### How to Obtain Cloud Manager API Credentials
 
-Configure the following secrets in the GitHub repository settings:
+#### **Step 1: Access Adobe Developer Console**
+1. Go to: https://developer.adobe.com/console
+2. Sign in with your Adobe ID
+3. Select your organization (Starbucks)
 
-1. **CM_CLIENT_ID**: Your Cloud Manager API Client ID
-2. **CM_CLIENT_SECRET**: Your Cloud Manager API Client Secret
-3. **CM_TECHNICAL_ACCOUNT_KEY**: Base64-encoded technical account private key
-4. **CM_ORG_ID**: Your Adobe IMS Organization ID
-5. **CM_API_KEY**: Your Cloud Manager API Key (if different from Client ID)
+#### **Step 2: Create/Access Cloud Manager API Project**
+1. Click **"Create new project"** or select existing Cloud Manager project
+2. Add **"Cloud Manager"** API to your project
+3. Configure OAuth Server-to-Server credentials
+
+#### **Step 3: Generate Credentials**
+The console will provide:
+- **Client ID** (`CM_CLIENT_ID`)
+- **Client Secret** (`CM_CLIENT_SECRET`) 
+- **Organization ID** (`CM_ORG_ID`)
+- **Technical Account ID** (used for technical account key)
+
+#### **Step 4: Generate Technical Account Key**
+1. Download the private key from the console
+2. Base64 encode it: `base64 -i private.key` (macOS/Linux)
+3. This becomes your `CM_TECHNICAL_ACCOUNT_KEY`
+
+#### **Step 5: API Key**
+- Usually same as Client ID: `CM_API_KEY = CM_CLIENT_ID`
+- Sometimes provided separately in console
+
+### Security Notes
+- 🔐 **Never commit credentials** to repository
+- 🔐 **Use GitHub Secrets** for all credential storage
+- 🔐 **Rotate credentials** regularly
+- 🔐 **Limit API permissions** to necessary operations only
 
 ### Pipeline Configuration
 
