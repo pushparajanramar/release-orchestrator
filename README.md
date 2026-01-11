@@ -11,6 +11,11 @@ The **Release Orchestrator repo**:
 
 Think of it as **"release intent + automation"**.
 
+## Key Documentation
+
+- **[VERSIONING-GUIDE.md](VERSIONING-GUIDE.md)** - Comprehensive versioning and tagging strategy (SemVer + Calendar qualifiers)
+- **[RELEASE-PROCESS.md](RELEASE-PROCESS.md)** - Complete release process documentation with roles and workflows
+
 ## Release Philosophy
 
 * What is fan-in

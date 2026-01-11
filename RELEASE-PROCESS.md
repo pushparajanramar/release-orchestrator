@@ -39,32 +39,123 @@ The Release Orchestrator manages **multi-tenant AEM deployments** through a stru
 - Implement security and access controls
 - Manage artifact promotion and integrity validation
 
-## Release Workflow
+## Versioning & Tagging Strategy
 
-### Phase 1: Development & Testing
+### Semantic Versioning (SemVer) + Calendar Qualifier
 
-1. **Code Development**
-   - Teams develop features in feature branches
-   - Code reviews and testing completed
-   - Ready for release candidate
+**Strategy**: Strict Semantic Versioning (MAJOR.MINOR.PATCH) + Calendar-based release qualifier for all repositories (platform and tenants).
+
+#### SemVer Rules (MAJOR.MINOR.PATCH)
+- **MAJOR** → Breaking changes / incompatible API changes (rare for platform, tenant-specific OK)
+- **MINOR** → Backward-compatible new features / enhancements
+- **PATCH** → Backward-compatible bug fixes / security patches
+
+#### Calendar Qualifier (YEAR.MONTH)
+- **Purpose**: Human-readable release tracking aligned with manifest naming
+- **Format**: `2026.01` (year.month)
+- **Usage**: Links technical versions to business release waves
+
+### Recommended Tag Patterns
+
+#### Platform Core Examples:
+```bash
+# Technical version tag (SemVer)
+git tag -a v1.12.0 -m "Platform core 1.12.0: new component model, breaking internal API"
+
+# Release wave tag (calendar-qualified)
+git tag -a 2026.01-v1.12.0 -m "January 2026 coordinated platform release"
+
+# Push both tags
+git push origin v1.12.0 2026.01-v1.12.0
+```
+
+#### Single Tenant Examples (Partners):
+```bash
+# Technical version tag
+git tag -a v3.8.2 -m "Partners tenant 3.8.2: enhanced loyalty features"
+
+# Release wave tag
+git tag -a 2026.01-v3.8.2 -m "January 2026 partners release"
+```
+
+#### Coordinated Release Examples:
+```
+Platform: 2026.01-v1.12.0
+Partners: 2026.01-v3.8.2
+US:       2026.01-v3.8.2
+CA:       2026.01-v2.4.1
+```
+*Same year.month prefix signals coordinated release wave*
+
+### Tagging Best Practices
+
+| Aspect | Recommendation | Why it matters | Example |
+|--------|----------------|----------------|---------|
+| **Tag Format** | `vMAJOR.MINOR.PATCH` (lowercase v) | Consistent, machine-readable, easy grep/sort | `v1.12.0` |
+| **Annotated Tags** | `git tag -a v1.12.0 -m "message"` | Metadata survives for audits & history | `git tag -a v1.12.0 -m "Platform 1.12.0 - Jan 2026"` |
+| **Release Tags** | `2026.01-v1.12.0` | Links technical version to business release | `2026.01-v1.12.0` |
+| **When to Tag** | Only on `release/dev` branch before manifest creation | Prevents premature tags; tags = production intent | After CI passes, before manifest |
+| **Push Strategy** | `git push origin --tags` | Ensures tags are shared immediately | Both technical + release tags |
+| **Immutability** | Never force-update or delete release tags | Critical for audit, rollback, reproducibility | Use new tags for fixes |
+| **Hotfix Tags** | Create from tagged commit: `git checkout v1.11.5` → fix → `v1.11.6` | Classic SemVer patch flow - safe & predictable | Emergency security patches |
+
+### Compatibility & Dependency Rules
+
+**Critical for Multi-Tenant Model** - Define and enforce via CI + manifest validation:
+
+#### Platform Version Requirements per Tenant:
+```yaml
+compatibility:
+  platform: "1.12.x"  # Platform version pattern
+  tenants:
+    partners: ">=1.12.0 <2.0.0"  # Range expressions
+    us: ">=1.12.0 <2.0.0"
+    ca: ">=1.10.0 <2.0.0"
+```
+
+#### Tenant Version Bump Guidelines:
+- **PATCH** (1.12.0 → 1.12.1) → Always safe, no platform change needed
+- **MINOR** (1.12.0 → 1.13.0) → Usually safe if platform contract unchanged
+- **MAJOR** (1.12.0 → 2.0.0) → Requires platform major bump or explicit exception + heavy testing
+
+#### Version Range Expressions in Manifests:
+```yaml
+# Use SemVer ranges for compatibility validation
+tenants:
+  partners:
+    version: "3.8.2"
+    compatibility: ">=1.12.0 <2.0.0"  # Must match platform
+```
+
+### Versioning Strategy Comparison
+
+| Pattern | Pros | Cons | Recommendation |
+|---------|------|------|----------------|
+| **Pure SemVer** (`v1.2.3`) | Industry standard, excellent tooling, clear compatibility | No business/release-wave context | Good baseline |
+| **Calendar versioning** (`2026.01.03`) | Very clear coordinated releases | No semantic meaning | Too loose |
+| **SemVer + Calendar prefix** | **Best of both**: technical safety + business readability | Slightly longer tags | **Strongly recommended** |
+| **CalVer only** | Simple for business stakeholders | Loses breaking-change visibility | Avoid |
+
+### Implementation in Release Process
+
+#### Phase 1: Development & Testing
 
 2. **Version Tagging**
    ```bash
-   # Platform team tags release
-   git tag v1.12.0
-   git push origin v1.12.0
+   # Platform team workflow
+   git checkout release/dev
+   git tag -a v1.12.0 -m "Platform core 1.12.0: new component model"
+   git tag -a 2026.01-v1.12.0 -m "January 2026 coordinated platform release"
+   git push origin --tags
 
-   # Tenant teams tag releases
-   git tag v3.8.2  # US tenant
-   git push origin v3.8.2
+   # Tenant teams workflow
+   git checkout release/dev
+   git tag -a v3.8.2 -m "Partners tenant 3.8.2: enhanced loyalty features"
+   git tag -a 2026.01-v3.8.2 -m "January 2026 partners release"
+   git push origin --tags
    ```
 
-3. **Dev Environment Deployment**
-   - Push to `release/dev` branch triggers automatic deployment
-   - No approval required for dev deployments
-   - Fast feedback for development teams
-
-### Phase 2: Release Preparation
+#### Phase 2: Release Preparation
 
 4. **Create Release Manifest**
    ```yaml
@@ -72,32 +163,38 @@ The Release Orchestrator manages **multi-tenant AEM deployments** through a stru
    releaseId: 2026.01
    type: standard
 
-   # Version compatibility matrix
+   # Version compatibility matrix (enforced by validation)
    compatibility:
      platform: "1.12.x"
      tenants:
-       us: ">=3.8.0"
-       ca: ">=2.4.0"
+       partners: ">=1.12.0 <2.0.0"
+       us: ">=1.12.0 <2.0.0"
+       ca: ">=1.10.0 <2.0.0"
 
    platform:
      repo: aem-platform-core
-     version: 1.12.0
+     version: 1.12.0  # SemVer version
      pipeline: platform
      sha: "abc123..."  # Artifact integrity
 
    tenants:
-     us:
-       repo: aem-tenant-us
-       version: 3.8.2
-       pipeline: tenant-us
+     partners:
+       repo: aem-tenant-partners
+       version: 3.8.2  # SemVer version
+       pipeline: partner-services
        sha: "def456..."  # Artifact integrity
    ```
 
-5. **Manifest Validation**
-   ```bash
-   ./scripts/validate-manifest.sh release-2026-01.yaml
-   # ✅ Validates structure, pipelines, compatibility, and integrity
-   ```
+### Benefits of This Strategy
+
+✅ **Precise Compatibility Contracts** (SemVer ranges)  
+✅ **Clear Business Context** (calendar qualifiers)  
+✅ **Full Auditability** (annotated + immutable tags)  
+✅ **Safe Rollbacks** (version history preservation)  
+✅ **Multi-Tenant Coordination** (release wave grouping)  
+✅ **Enterprise Compliance** (change management alignment)
+
+This hybrid approach gives you both technical precision (SemVer) and business clarity (calendar qualifiers) - perfect for enterprise multi-tenant platforms like Starbucks AEM.
 
 6. **Stage Environment Testing**
    - Push to `release/stage` branch

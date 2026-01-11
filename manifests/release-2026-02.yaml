@@ -1,20 +1,30 @@
 releaseId: 2026.02
 type: standard
 
+# Version compatibility matrix (enforced by validation)
+compatibility:
+  platform: "1.13.x"
+  tenants:
+    us: ">=1.13.0 <2.0.0"
+    ca: ">=1.10.0 <2.0.0"
+
 platform:
   repo: aem-platform-core
   version: 1.13.0
   pipeline: platform-prod
+  sha: "bcd234efa567890..."  # Artifact integrity checksum
 
 tenants:
   us:
     repo: aem-tenant-us
     version: 3.9.0
     pipeline: tenant-us-prod
+    sha: "efa567890bcd234..."  # Artifact integrity checksum
   ca:
     repo: aem-tenant-ca
     version: 2.5.0
     pipeline: tenant-ca-prod
+    sha: "890abcdef234567..."  # Artifact integrity checksum
 
 order:
   - platform
